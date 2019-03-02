@@ -1,0 +1,24 @@
+#!/bin/sh
+# Automatically remap wacom devices when switching monitors in i3.
+#
+# Usage:
+# i3-map-wacom-to-monitor [device] [device] [...]
+#
+# It is recommended that you put something like this in your .xinitrc after
+# starting i3 as a background process:
+#
+# i3 &
+# i3pid=$!
+# i3-map-wacom-to-input" "Wacom Intuos PT S 2 Pen stylus" &
+# wait $i3pid
+#
+
+i3-msg -t subscribe -m '[ "workspace" ]' \
+|while read -r json; do
+	# Get the name of the focused monitor
+	output="$(echo "$json"|jq --raw-output '.["current"]["output"]')"
+	# Run wacom-aspect for all given devices
+	for device in "${@}"; do
+		wacom-aspect "$output" "${@}"
+	done
+done

@@ -1,0 +1,61 @@
+#!/bin/bash
+# xsetwacom does not come with a command to map the tablet to the monitor and
+# keep a sane aspect ratio. This script seeks to provide that functionality.
+
+set -e
+set -u
+
+if [ $# -eq 0 ]; then
+	echo "Maps one or more wacom devices to a monitor and sets a sane aspect ratio based on the monitor resolution"|fmt
+	echo ""
+	echo "Usage:"
+	echo "$0 monitor [device] [device] [...]"
+	echo ""
+	echo "You can the monitor name from xrandr and the tablet device name from xsetwacom --list"|fmt
+	exit 1
+fi
+
+monitor="$1"; shift
+for device in "${@}"; do
+	# Read out the current monitor geometry. The width/height fields are
+	# separated with an x. A + sign marks the end of the data we're interested in.
+	IFS="x" read -r -d '+' monitor_width monitor_height < <(xrandr --listmonitors|awk -v selectmonitor="$monitor" '$4==selectmonitor { print $3 }')
+	# The two geometry fields have a slash and a number after them. We don't need them.
+	monitor_width="${monitor_width%%/*}"
+	monitor_height="${monitor_height%%/*}"
+
+	# Copy the current area so we can restore it after reading the default
+	read -a restore < <(xsetwacom --get "$device" Area)
+	# Reset the area so we can read out the factory default size
+	xsetwacom --set "$device" ResetArea
+	# Pull out x/y coordinates for the upper right corner and lower left
+	read -a area < <(xsetwacom --get "$device" Area)
+	# Restore the original Area setting. Particularly useful in case the script
+	# fails further down, so the user isn't left with a confusing setting.
+	xsetwacom --set "$device" Area "${restore[@]}"
+
+	tablet_width=$((( ${area[2]} - ${area[0]} )))
+	tablet_height=$((( ${area[3]} - ${area[1]} )))
+
+	# Calculate a preliminary width/height
+	width=$((( $tablet_height * $monitor_width / $monitor_height )))
+	height=$((( $tablet_width * $monitor_height / $monitor_width )))
+
+	# The calculated width/height will likely have one of the axis
+	# overshooting. We pull it down, resulting in a perfect match.
+	if [ $height -gt $tablet_height ]; then
+		height=$tablet_height
+	elif [ $width -gt $tablet_width ]; then
+		width=$tablet_width
+	fi
+
+	declare -a newarea=()
+	# Calculate the new area size and center it on the tablet
+	newarea[0]=$((( $tablet_width/2 - $width/2 )))
+	newarea[1]=$((( $tablet_height/2 - $height/2 )))
+	newarea[2]=$((( $tablet_width/2 + $width/2 )))
+	newarea[3]=$((( $tablet_height/2 + $height/2 )))
+
+	xsetwacom --set "$device" MapToOutput "$monitor"
+	xsetwacom --set "$device" Area "${newarea[@]}"
+done
