@@ -4,21 +4,18 @@
 # Usage:
 # i3-map-wacom-to-monitor [device] [device] [...]
 #
-# It is recommended that you put something like this in your .xinitrc after
-# starting i3 as a background process:
-#
-# i3 &
-# i3pid=$!
-# i3-map-wacom-to-input" "Wacom Intuos PT S 2 Pen stylus" &
-# wait $i3pid
-#
+# It is recommended that you put something like this in your .i3/config:
+# exec --no-startup-id "i3-map-device-to-monitor 'Wacom Intuos PT S 2 Pen stylus' 'Wacom Intuos PT S 2 Finger touch"
 
-i3-msg -t subscribe -m '[ "workspace" ]' \
-|while read -r json; do
+run() {
 	# Get the name of the focused monitor
 	output="$(echo "$json"|jq --raw-output '.["current"]["output"]')"
 	# Run wacom-aspect for all given devices
-	for device in "${@}"; do
-		wacom-aspect "$output" "${@}"
-	done
+	wacom-aspect "$output" "${@}"
+}
+
+run "${@}"
+i3-msg -t subscribe -m '[ "workspace" ]' \
+|while read -r json; do
+	run "${@}"
 done

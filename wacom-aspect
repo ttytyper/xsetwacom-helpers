@@ -16,14 +16,14 @@ if [ $# -eq 0 ]; then
 fi
 
 monitor="$1"; shift
-for device in "${@}"; do
-	# Read out the current monitor geometry. The width/height fields are
-	# separated with an x. A + sign marks the end of the data we're interested in.
-	IFS="x" read -r -d '+' monitor_width monitor_height < <(xrandr --listmonitors|awk -v selectmonitor="$monitor" '$4==selectmonitor { print $3 }')
-	# The two geometry fields have a slash and a number after them. We don't need them.
-	monitor_width="${monitor_width%%/*}"
-	monitor_height="${monitor_height%%/*}"
+# Read out the current monitor geometry. The width/height fields are
+# separated with an x. A + sign marks the end of the data we're interested in.
+IFS="x" read -r -d '+' monitor_width monitor_height < <(xrandr --listmonitors|awk -v selectmonitor="$monitor" '$4==selectmonitor { print $3 }')
+# The two geometry fields have a slash and a number after them. We don't need them.
+monitor_width="${monitor_width%%/*}"
+monitor_height="${monitor_height%%/*}"
 
+for device in "${@}"; do
 	# Copy the current area so we can restore it after reading the default
 	read -a restore < <(xsetwacom --get "$device" Area)
 	# Reset the area so we can read out the factory default size
